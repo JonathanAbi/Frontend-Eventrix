@@ -7,6 +7,7 @@ const {
   generateAccessToken,
   generateRefreshToken,
 } = require("../utils/tokenUtils");
+const { sendOtpEmail } = require("../services/emailService");
 
 const saveRefreshToken = async (userID, refreshToken) => {
   try {
@@ -18,7 +19,7 @@ const saveRefreshToken = async (userID, refreshToken) => {
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
   } catch (error) {
-    console.log(error)
+    console.log(error);
   }
 };
 
@@ -28,21 +29,40 @@ const registerParticipant = async (req) => {
   // Validasi input
   if (!name || !email || !password) {
     const error = new Error("All fields are required");
-    error.status = 401;
+    error.status = 400;
     throw error;
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-  });
+  let newUser = await User.findOne({ where: { email } });
 
-  const userWithoutPassword = newUser.toJSON();
-  delete userWithoutPassword.password;
+  if (newUser) {
+    if (newUser.is_verified === false) {
+      const error = new Error("User is registered, please verify OTP");
+      error.status = 400;
+      throw error;
+    } else {
+      const error = new Error("Email already in use");
+      error.status = 400;
+      throw error;
+    }
+  } else {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      otp_code: Math.floor(100000 + Math.random() * 900000).toString(),
+      otp_expires_at: Date.now() + 5 * 60 * 1000,
+    });
+  }
 
-  return userWithoutPassword;
+  await sendOtpEmail(email, newUser);
+
+  const result = newUser.toJSON();
+  delete result.password;
+  delete result.otp_code;
+
+  return result;
 };
 
 const registerOrganizer = async (req) => {
@@ -60,12 +80,72 @@ const registerOrganizer = async (req) => {
     email,
     password: hashedPassword,
     role: "organizer",
+    is_verified: true,
   });
 
   const userWithoutPassword = newUser.toJSON();
   delete userWithoutPassword.password;
 
   return userWithoutPassword;
+};
+
+const resendOtp = async (email) => {
+  const user = await User.findOne({ where: { email } });
+  if (!user) {
+    const error = new Error("User not found");
+    error.status = 404;
+    throw error;
+  }
+  if (user.is_verified) {
+    const error = new Error("User already verified");
+    error.status = 400;
+    throw error;
+  }
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiresAt = Date.now() + 5 * 60 * 1000;
+
+  user.otp_code = otpCode;
+  user.otp_expires_at = otpExpiresAt;
+  await user.save();
+
+  await sendOtpEmail(email, user);
+
+  const result = user.toJSON();
+  delete result.password;
+  delete result.otp_code;
+
+  return result;
+};
+
+const verifyOtp = async (email, otpCode) => {
+  const user = await User.findOne({ where: { email } });
+  if (!user) {
+    const error = new Error("User not found");
+    error.status = 404;
+    throw error;
+  }
+  if (user.is_verified) {
+    const error = new Error("User already verified");
+    error.status = 400;
+    throw error;
+  }
+
+  if (user.otp_code === otpCode && user.otp_expires_at > Date.now()) {
+    user.is_verified = true;
+    user.otp_code = null;
+    user.otp_expires_at = null;
+    await user.save();
+
+    const result = user.toJSON();
+    delete result.password;
+
+    return result;
+  } else {
+    const error = new Error("Invalid or expired OTP");
+    error.status = 400;
+    throw error;
+  }
 };
 
 const login = async (email, password) => {
@@ -82,10 +162,22 @@ const login = async (email, password) => {
     throw error;
   }
 
+  if (user.is_verified === false) {
+    const error = new Error("Your account is not active");
+    error.status = 401;
+    throw error;
+  }
+
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
   await saveRefreshToken(user.id, refreshToken);
-  return { name: user.name, email: user.email, role: user.role, accessToken, refreshToken };
+  return {
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    accessToken,
+    refreshToken,
+  };
 };
 
 const refreshToken = async (refreshToken) => {
@@ -122,4 +214,6 @@ module.exports = {
   login,
   refreshToken,
   logout,
+  resendOtp,
+  verifyOtp,
 };
