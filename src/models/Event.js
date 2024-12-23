@@ -15,13 +15,17 @@ const Event = sequelize.define("Event", {
   description: { type: DataTypes.TEXT, allowNull: true },
   date: { type: DataTypes.DATE, allowNull: false },
   location: { type: DataTypes.STRING, allowNull: false },
-  category: { type: DataTypes.STRING, allowNull: false },
+  category: {
+    type: DataTypes.ENUM("workshop", "concert", "seminar"),
+    allowNull: false,
+  }, 
   status: {
-    type: DataTypes.ENUM("active", "completed", "cancelled"),
-    defaultValue: "active",
+    type: DataTypes.ENUM("pending", "active", "completed", "cancelled"),
+    defaultValue: "pending",
   },
 });
 
 Event.belongsTo(User, { foreignKey: "organizer_id", as: "organizer" });
+User.hasMany(Event, { foreignKey: "organizer_id", as: "events" });
 
 module.exports = Event;

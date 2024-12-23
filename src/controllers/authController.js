@@ -3,7 +3,7 @@ const authService = require("../services/authService");
 const registerParticipant = async (req, res) => {
   try {
     const result = await authService.registerParticipant(req);
-    res.json({ message: "Participant registered successfully", user: result });
+    res.json({ message: "Participant registered successfully", data: result });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message });
   }
@@ -12,7 +12,7 @@ const registerParticipant = async (req, res) => {
 const registerOrganizer = async (req, res) => {
   try {
     const result = await authService.registerOrganizer(req);
-    res.json({ message: "Organizer registered successfully", user: result });
+    res.json({ message: "Organizer registered successfully", data: result });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message });
   }
