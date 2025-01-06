@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { loginUser } from "../../features/auth/authSlice";
+import { loginUser, resetError } from "../../features/auth/authSlice";
 import { FcGoogle } from "react-icons/fc";
 import { toast, Bounce } from "react-toastify";
 import ThemeToggle from "../../components/ThemeToggle";
@@ -55,7 +55,7 @@ export default function Login() {
       });
       navigate("/");
     }
-  }, [isAuthenticated, user, navigate]); // Hanya jalan saat isAuthenticate berubah
+  }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
     if (error) {
@@ -70,8 +70,9 @@ export default function Login() {
         theme: "light",
         transition: Bounce,
       });
+      dispatch(resetError());
     }
-  }, [error]); // Hanya jalan saat error berubah
+  }, [error, dispatch]);
 
   return (
     <>

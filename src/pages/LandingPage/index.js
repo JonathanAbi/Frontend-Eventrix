@@ -1,7 +1,10 @@
 import React from "react";
-import { useSelector } from "react-redux";
+import Navbar from "../../components/Navbar";
 
 export default function LandingPage() {
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
-  return <div>Welcome {isAuthenticated && user.name}</div>;
+  return (
+    <>
+      <Navbar />
+    </>
+  );
 }
